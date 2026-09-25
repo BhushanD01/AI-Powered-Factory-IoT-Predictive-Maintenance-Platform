@@ -152,7 +152,7 @@ def maintenance_prediction(payload: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="The analytics payload is empty or invalid.")
 
     base_dir = Path(__file__).resolve().parent
-    manual_pdf_path = str(base_dir / "data" / "Factory_Simulator_2040_Maintenance_Manual.pdf")
+    manual_pdf_path = str(base_dir / "data" / "Factory_Maintenance_Manual.pdf")
 
     if not Path(manual_pdf_path).exists():
         raise HTTPException(
