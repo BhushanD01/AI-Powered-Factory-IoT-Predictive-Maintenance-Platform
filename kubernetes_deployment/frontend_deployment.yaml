@@ -1,0 +1,54 @@
+# Frontend Deployment
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: frontend-deployment
+  labels:
+    app: frontend-deployment
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: frontend-deployment
+
+  template:
+    metadata:
+      labels:
+        app: frontend-deployment
+
+    spec:
+      containers:
+        - name: frontend-deployment
+
+          image: ${FRONTEND_IMAGE}
+
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 3000
+
+---
+
+# Frontend Service
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: frontend-deployment
+
+spec:
+  selector:
+    app: frontend-deployment
+
+  type: LoadBalancer
+
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 3000

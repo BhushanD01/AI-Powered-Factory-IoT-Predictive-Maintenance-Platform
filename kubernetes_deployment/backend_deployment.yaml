@@ -1,0 +1,57 @@
+# Backend Deployment
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: backend-deployment
+  labels:
+    app: backend-deployment
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: maintenance-backend
+
+  template:
+    metadata:
+      labels:
+        app: maintenance-backend
+
+    spec:
+      containers:
+        - name: backend-deployment
+
+          image: ${BACKEND_IMAGE}
+
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 8000
+
+          envFrom:
+            - secretRef:
+                name: backend-secrets
+
+---
+
+# Backend Service
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: backend-deployment
+
+spec:
+  selector:
+    app: maintenance-backend
+
+  type: LoadBalancer
+
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8000

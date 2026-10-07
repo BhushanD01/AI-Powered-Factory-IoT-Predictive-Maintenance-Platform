@@ -1,0 +1,160 @@
+name: Deploy AI-Powered-Factory-IoT-Predictive-Maintenance-Platform
+
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      BACKEND_IMAGE: ${{ secrets.BACKEND_IMAGE }}
+      FRONTEND_IMAGE: ${{ secrets.FRONTEND_IMAGE }}
+      EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+
+    steps:
+
+      # ----------------------------------------------------
+      # Checkout Repository
+      # ----------------------------------------------------
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------
+      # Configure AWS Credentials
+      # ----------------------------------------------------
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ----------------------------------------------------
+      # Login to Amazon ECR
+      # ----------------------------------------------------
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ----------------------------------------------------
+      # Build, Tag and Push Backend Image
+      # ----------------------------------------------------
+
+      - name: Build Backend Image
+        run: |
+          docker build -t backend-deployment ./backend
+
+      - name: Tag Backend Image
+        run: |
+          docker tag backend-deployment:latest $BACKEND_IMAGE
+
+      - name: Push Backend Image
+        run: |
+          docker push $BACKEND_IMAGE
+
+      # ----------------------------------------------------
+      # Build, Tag and Push Frontend Image
+      # ----------------------------------------------------
+
+      - name: Build Frontend Image
+        run: |
+          docker build -t frontend-deployment ./frontend
+
+      - name: Tag Frontend Image
+        run: |
+          docker tag frontend-deployment:latest $FRONTEND_IMAGE
+
+      - name: Push Frontend Image
+        run: |
+          docker push $FRONTEND_IMAGE
+
+      # ----------------------------------------------------
+      # Configure kubectl
+      # ----------------------------------------------------
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $EKS_CLUSTER_NAME
+
+      # ----------------------------------------------------
+      # Replace Image Placeholders in Manifests
+      # ----------------------------------------------------
+
+      - name: Update Backend Manifest
+        run: |
+          sed -i "s|\${BACKEND_IMAGE}|$BACKEND_IMAGE|g" kubernetes_deployment/backend_deployment.yaml
+
+      - name: Update Frontend Manifest
+        run: |
+          sed -i "s|\${FRONTEND_IMAGE}|$FRONTEND_IMAGE|g" kubernetes_deployment/frontend_deployment.yaml
+
+      # ----------------------------------------------------
+      # Create / Update Kubernetes Secret
+      # ----------------------------------------------------
+
+      - name: Create AWS Credentials Secret
+        env:
+          SECRET_AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          SECRET_AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          kubectl create secret generic aws-credentials \
+            --from-literal=AWS_ACCESS_KEY_ID="$SECRET_AWS_ACCESS_KEY_ID" \
+            --from-literal=AWS_SECRET_ACCESS_KEY="$SECRET_AWS_SECRET_ACCESS_KEY" \
+            --from-literal=AWS_REGION="$AWS_REGION" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # ----------------------------------------------------
+      # Deploy Kubernetes Resources
+      # ----------------------------------------------------
+
+      - name: Deploy to Amazon EKS
+        run: |
+          kubectl apply -f kubernetes/
+
+      # ----------------------------------------------------
+      # Restart Deployments
+      #
+      # The image tag stays the same between pushes, so the manifest
+      # does not change and Kubernetes would not roll out new pods
+      # on its own. Restarting forces the new image to be pulled.
+      # ----------------------------------------------------
+
+      - name: Restart Deployments
+        run: |
+          kubectl rollout restart deployment/backend-deployment
+          kubectl rollout restart deployment/frontend-deployment
+
+      # ----------------------------------------------------
+      # Verify Deployment
+      # ----------------------------------------------------
+
+      - name: Wait for Backend
+        run: |
+          kubectl rollout status deployment/backend-deployment --timeout=300s
+
+      - name: Wait for Frontend
+        run: |
+          kubectl rollout status deployment/frontend-deployment --timeout=300s
+
+      # ----------------------------------------------------
+      # List Resources
+      # ----------------------------------------------------
+
+      - name: List Resources
+        run: |
+          kubectl get deployments
+          kubectl get pods
+          kubectl get svc
