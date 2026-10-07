@@ -32,7 +32,7 @@ spec:
 
           envFrom:
             - secretRef:
-                name: backend-secrets
+                name: aws-credentials
 
 ---
 
