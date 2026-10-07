@@ -122,7 +122,7 @@ jobs:
 
       - name: Deploy to Amazon EKS
         run: |
-          kubectl apply -f kubernetes/
+          kubectl apply -f kubernetes_deployment/
 
       # ----------------------------------------------------
       # Restart Deployments
