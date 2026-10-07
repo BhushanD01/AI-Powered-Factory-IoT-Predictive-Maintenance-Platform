@@ -126,10 +126,6 @@ jobs:
 
       # ----------------------------------------------------
       # Restart Deployments
-      #
-      # The image tag stays the same between pushes, so the manifest
-      # does not change and Kubernetes would not roll out new pods
-      # on its own. Restarting forces the new image to be pulled.
       # ----------------------------------------------------
 
       - name: Restart Deployments
